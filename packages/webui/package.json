@@ -1,0 +1,8 @@
+{
+  "name": "@kaenbyoujs/webui",
+  "version": "0.0.0",
+  "dependencies": {
+    "@satorijs/core": "^3.2.1",
+    "cordis": "^3.3.1"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "@kaenbyoujs/messages",
+  "description": "Message storage plugins for kaenbyou.",
+  "version": "0.0.1",
+  "main": "lib/index.js",
+  "module": "lib/index.mjs",
+  "typings": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "src"
+  ],
+  "author": "Seidko <seidko.coding@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kaenbyoujs/kaenbyou.git",
+    "directory": "packages/messages"
+  },
+  "bugs": {
+    "url": "https://github.com/kaenbyoujs/kaenbyou/issues"
+  },
+  "homepage": "https://github.com/kaenbyoujs/kaenbyou",
+  "keywords": [
+    "bot"
+  ],
+  "koishi": {
+    "description": {
+      "en": "Message storage plugins for kaenbyou.",
+      "zh": "kaenbyou 消息存储组件。"
+    }
+  },
+  "devDependencies": {
+    "@kaenbyoujs/database-core": "0.0.1"
+  }
+}
