@@ -25,6 +25,13 @@ declare module '@kaenbyoujs/database-core' {
   }
 }
 
+interface QueueItem {
+  channelId: string
+  selfId: string
+  final: string
+  next?: string
+}
+
 export const inject = ['database', 'timer']
 
 export function apply(ctx: Context) {
@@ -48,12 +55,17 @@ export function apply(ctx: Context) {
     })))
   }
 
-  const queue: {
-    channelId: string
-    selfId: string
-    final: string
-    next?: string
-  }[] = []
+  async function getFinalMessages(platform: string, guildId: string, selfId: string): Promise<QueueItem[]> {
+    return ctx.database.select('@kaenbyoujs/messages@v1')
+      .where({ platform, guildId })
+      // https://github.com/shigma/minato/issues/60
+      // @ts-expect-error
+      .groupBy(['channelId'], { time: row => $.max(row.createdAt), final: 'messageId' })
+      .execute()
+      .then(data => data.map(data => ({ ...data, selfId })))
+  }
+
+  const queue: QueueItem[] = []
   
   ctx.database.extend('@kaenbyoujs/messages@v1', {
     id: {
@@ -86,34 +98,16 @@ export function apply(ctx: Context) {
   })
 
   ctx.on('bot-status-updated', async bot => {
-    const channelIds: string[] = []
+    const guilds: Promise<QueueItem[]>[] = []
     for await (const guild of bot.getGuildIter()) {
-      for await (const channel of bot.getChannelIter(guild.id)) {
-        channelIds.push(channel.id)
-      }
+      guilds.push(getFinalMessages(bot.platform, guild.id, bot.selfId))
     }
 
-    const channels = await ctx.database.select('@kaenbyoujs/messages@v1')
-      .where({ platform: bot.platform, channelId: { $in: channelIds } })
-      // https://github.com/shigma/minato/issues/60
-      // @ts-expect-error
-      .groupBy(['channelId'], { time: row => $.max(row.createdAt), final: 'messageId' })
-      .execute()
-      .then(data => data.map(data => ({ ...data, selfId: bot.selfId })))
-
-    queue.push(...channels)
+    queue.push(...await Promise.all(guilds).then(i => i.flat()))
   })
 
-  ctx.on('guild-added', async ({ guildId, platform, bot }) => {
-    const channels = await ctx.database.select('@kaenbyoujs/messages@v1')
-      .where({ platform, guildId })
-      // https://github.com/shigma/minato/issues/60
-      // @ts-expect-error
-      .groupBy(['channelId'], { time: row => $.max(row.createdAt), final: 'messageId' })
-      .execute()
-      .then(data => data.map(data => ({ ...data, selfId: bot.selfId })))
-
-    queue.push(...channels)
+  ctx.on('guild-added', async ({ platform, guildId, bot }) => {
+    queue.push(...await getFinalMessages(platform, guildId, bot.selfId))
   })
 
   ctx.on('message', async session => {
