@@ -1,4 +1,4 @@
-import { Context, Universal } from '@satorijs/core'
+import { Context, Universal, Service } from '@satorijs/core'
 import { MaybeArray, makeArray } from 'cosmokit'
 import { $ } from '@kaenbyoujs/database-core'
 import {} from '@kaenbyoujs/cordis-plugin-timer'
@@ -34,116 +34,124 @@ interface QueueItem {
 
 export const inject = ['database', 'timer']
 
-export function apply(ctx: Context) {
-  async function fromMessages(msg: MaybeArray<Universal.Message>, platform: string) {
-    const messages = makeArray(msg)
-    
-    await ctx.database.upsert('@kaenbyoujs/messages@v1', messages.map(m => ({
-      content: m.content,
-      messageId: m.id,
-      platform,
-      userId: m.user.id,
-      avatar: m.user.avatar,
-      createdAt: new Date(m.createdAt ?? Date.now()),
-      quoteId: m.quote.id,
-      username: m.user.name,
-      nickname: m.user.nick,
-      channelId: m.channel.id,
-      guildId: m.guild.id,
-      updatedAt: new Date(m.updatedAt ?? Date.now()),
-      edited: m.createdAt !== m.updatedAt,
-    })))
-  }
+export namespace MessageService {
+  export interface Config {}
+}
 
-  async function getFinalMessages(platform: string, guildId: string, selfId: string): Promise<QueueItem[]> {
-    return ctx.database.select('@kaenbyoujs/messages@v1')
-      .where({ platform, guildId })
-      // https://github.com/shigma/minato/issues/60
-      // @ts-expect-error
-      .groupBy(['channelId'], { time: row => $.max(row.createdAt), final: 'messageId' })
-      .execute()
-      .then(data => data.map(data => ({ ...data, selfId })))
-  }
+export default class MessageService extends Service {
+  constructor(public ctx: Context, public config: MessageService.Config) {
+    super(ctx, 'message')
 
-  const queue: QueueItem[] = []
+    async function fromMessages(msg: MaybeArray<Universal.Message>, platform: string) {
+      const messages = makeArray(msg)
+      
+      await ctx.database.upsert('@kaenbyoujs/messages@v1', messages.map(m => ({
+        content: m.content,
+        messageId: m.id,
+        platform,
+        userId: m.user.id,
+        avatar: m.user.avatar,
+        createdAt: new Date(m.createdAt ?? Date.now()),
+        quoteId: m.quote.id,
+        username: m.user.name,
+        nickname: m.user.nick,
+        channelId: m.channel.id,
+        guildId: m.guild.id,
+        updatedAt: new Date(m.updatedAt ?? Date.now()),
+        edited: m.createdAt !== m.updatedAt,
+      })))
+    }
   
-  ctx.database.extend('@kaenbyoujs/messages@v1', {
-    id: {
-      type: 'unsigned',
-      length: 8,
-    },
-    content: 'text',
-    messageId: 'string',
-    platform: 'string',
-    userId: 'string',
-    avatar: 'string',
-    createdAt: 'timestamp',
-    quoteId: 'string',
-    username: 'string',
-    nickname: 'string',
-    channelId: 'string',
-    guildId: 'string',
-    updatedAt: 'timestamp',
-    deleted: {
-      type: 'boolean',
-      initial: false,
-    },
-    edited: {
-      type: 'boolean',
-      initial: false,
-    },
-  }, {
-    autoInc: true,
-    primary: 'id',
-  })
-
-  ctx.on('bot-status-updated', async bot => {
-    const guilds: Promise<QueueItem[]>[] = []
-    for await (const guild of bot.getGuildIter()) {
-      guilds.push(getFinalMessages(bot.platform, guild.id, bot.selfId))
+    async function getFinalMessages(platform: string, guildId: string, selfId: string): Promise<QueueItem[]> {
+      return ctx.database.select('@kaenbyoujs/messages@v1')
+        .where({ platform, guildId })
+        // https://github.com/shigma/minato/issues/60
+        // @ts-expect-error
+        .groupBy(['channelId'], { time: row => $.max(row.createdAt), final: 'messageId' })
+        .execute()
+        .then(data => data.map(data => ({ ...data, selfId })))
     }
-
-    queue.push(...await Promise.all(guilds).then(i => i.flat()))
-  })
-
-  ctx.on('guild-added', async ({ platform, guildId, bot }) => {
-    queue.push(...await getFinalMessages(platform, guildId, bot.selfId))
-  })
-
-  ctx.on('message', async session => {
-    await fromMessages(session.event.message, session.platform)
-  })
-
-  ctx.on('message-deleted', async session => {
-    const msg = session.event.message
-    await ctx.database.set('@kaenbyoujs/messages@v1', { messageId: msg.id, platform: session.platform }, {
-      updatedAt: new Date(msg.updatedAt ?? Date.now()),
-      deleted: true,
+  
+    const queue: QueueItem[] = []
+    
+    ctx.database.extend('@kaenbyoujs/messages@v1', {
+      id: {
+        type: 'unsigned',
+        length: 8,
+      },
+      content: 'text',
+      messageId: 'string',
+      platform: 'string',
+      userId: 'string',
+      avatar: 'string',
+      createdAt: 'timestamp',
+      quoteId: 'string',
+      username: 'string',
+      nickname: 'string',
+      channelId: 'string',
+      guildId: 'string',
+      updatedAt: 'timestamp',
+      deleted: {
+        type: 'boolean',
+        initial: false,
+      },
+      edited: {
+        type: 'boolean',
+        initial: false,
+      },
+    }, {
+      autoInc: true,
+      primary: 'id',
     })
-  })
-
-  ctx.on('message-updated', async session => {
-    const msg = session.event.message
-    await ctx.database.set('@kaenbyoujs/messages@v1', { messageId: msg.id, platform: session.platform }, {
-      content: msg.content,
-      updatedAt: new Date(msg.updatedAt ?? Date.now()),
-      edited: true,
+  
+    ctx.on('bot-status-updated', async bot => {
+      const guilds: Promise<QueueItem[]>[] = []
+      for await (const guild of bot.getGuildIter()) {
+        guilds.push(getFinalMessages(bot.platform, guild.id, bot.selfId))
+      }
+  
+      queue.push(...await Promise.all(guilds).then(i => i.flat()))
     })
-  })
-
-  ctx.setInterval(async () => {
-    const data = queue.shift()
-    const bot = ctx.bots.find((bot) => bot.selfId === data.selfId)
-
-    const { data: messages, next } = await bot.getMessageList(data.channelId, data.next)
-    const finalIndex = messages.findIndex(m => m.id === data.final)
-    if (finalIndex !== -1) {
-      await fromMessages(messages.slice(0, finalIndex), bot.platform)
-      return
-    }
-
-    await fromMessages(messages, bot.platform)
-    data.next = next
-    queue.push(data)
-  }, 1000)
+  
+    ctx.on('guild-added', async ({ platform, guildId, bot }) => {
+      queue.push(...await getFinalMessages(platform, guildId, bot.selfId))
+    })
+  
+    ctx.on('message', async session => {
+      await fromMessages(session.event.message, session.platform)
+    })
+  
+    ctx.on('message-deleted', async session => {
+      const msg = session.event.message
+      await ctx.database.set('@kaenbyoujs/messages@v1', { messageId: msg.id, platform: session.platform }, {
+        updatedAt: new Date(msg.updatedAt ?? Date.now()),
+        deleted: true,
+      })
+    })
+  
+    ctx.on('message-updated', async session => {
+      const msg = session.event.message
+      await ctx.database.set('@kaenbyoujs/messages@v1', { messageId: msg.id, platform: session.platform }, {
+        content: msg.content,
+        updatedAt: new Date(msg.updatedAt ?? Date.now()),
+        edited: true,
+      })
+    })
+  
+    ctx.setInterval(async () => {
+      const data = queue.shift()
+      const bot = ctx.bots.find((bot) => bot.selfId === data.selfId)
+  
+      const { data: messages, next } = await bot.getMessageList(data.channelId, data.next)
+      const finalIndex = messages.findIndex(m => m.id === data.final)
+      if (finalIndex !== -1) {
+        await fromMessages(messages.slice(0, finalIndex), bot.platform)
+        return
+      }
+  
+      await fromMessages(messages, bot.platform)
+      data.next = next
+      queue.push(data)
+    }, 1000)
+  }
 }
