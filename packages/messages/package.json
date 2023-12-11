@@ -29,6 +29,13 @@
       "zh": "kaenbyou 消息存储组件。"
     }
   },
+  "dependencies": {
+    "@satorijs/core": "^3.2.4",
+    "cosmokit": "^1.5.1"
+  },
+  "peerDependencies": {
+    "cordis": "^3.3.1"
+  },
   "devDependencies": {
     "@kaenbyoujs/database-core": "0.0.1"
   }

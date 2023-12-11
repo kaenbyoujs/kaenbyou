@@ -8,9 +8,8 @@
     "external/*",
     "external/*/external/*",
     "external/*/packages/*",
-    "external/upstream/adapter/*",
     "external/upstream/database/*",
-    "external/upstream/server/*",
+    "external/upstream/utils/*",
     "packages/*"
   ],
   "scripts": {
