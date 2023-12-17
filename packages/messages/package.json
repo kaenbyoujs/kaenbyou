@@ -30,11 +30,12 @@
     }
   },
   "dependencies": {
-    "@satorijs/core": "^3.2.4",
-    "cosmokit": "^1.5.1"
+    "@satorijs/core": "^3.3.1",
+    "cosmokit": "^1.5.1",
+    "schemastery": "^3.14.2"
   },
   "peerDependencies": {
-    "cordis": "^3.3.1"
+    "cordis": "^3.4.0"
   },
   "devDependencies": {
     "@kaenbyoujs/database-core": "0.0.1"
