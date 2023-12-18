@@ -49,15 +49,54 @@ class MessageService extends Service {
 
   constructor(public ctx: Context, public config: MessageService.Config) {
     super(ctx, 'message')
-    const queue = []
+    const queue = ctx.createQueue<Task>(async (task) => {
+      const bot = ctx.bots.find((bot) => bot.selfId === task.selfId)
+      if (!bot) {
+        this.logger.warn('Channel "%s" message sync task failed. Maybe bot offline.', task.channelId)
+        return
+      }
 
-    async function upsert(msg: MaybeArray<Update<Messages>>) {
+      const { data, next } = await bot.getMessageList(task.channelId, task.next)
+      const sorted = data
+        .map(m => {
+          if (!m.createdAt && m.timestamp) m.createdAt = m.timestamp
+          return m
+        })
+        .sort((a, b) => b.createdAt - a.createdAt)
+      const finalIndex = sorted.findIndex(m => m.id === task.final)
+      if (finalIndex === 0) return
+      const messages = finalIndex === -1 ? sorted : sorted.slice(0, finalIndex)
+
+      await upsert(messages.map(m => ({
+        content: m.content,
+        messageId: m.id,
+        platform: bot.platform,
+        channelId: task.channelId,
+        guildId: task.guildId,
+        quoteId: m.quote?.id,
+        createdAt: new Date(m.timestamp ?? Date.now()),
+        updatedAt: new Date(m.updatedAt ?? Date.now()),
+        edited: m.updatedAt ? m.createdAt !== m.updatedAt : false,
+        'user.userId': m.user.id,
+        'user.avatar': m.user.avatar,
+        'user.username': m.user.name,
+        'user.nickname': m.user.nick,
+      })))
+
+      if (finalIndex === -1) {
+        task.next = next
+        queue.push(task)
+      } else {
+        this.logger.debug('Channel "%s" message sync complete successfully.', task.channelId)
+      }
+    }, config.fetchInterval)
+
+    const upsert = async (msg: MaybeArray<Update<Messages>>) => {
       const messages = makeArray(msg)
-
       await ctx.database.upsert('@kaenbyoujs/messages@v1', messages, ['channelId', 'messageId', 'platform', 'guildId'])
     }
 
-    async function getFinalMessages(platform: string, guildId: string, selfId: string): Promise<Task[]> {
+    const getFinalMessages = async (platform: string, guildId: string, selfId: string): Promise<Task[]> => {
       const a = await ctx.database.select('@kaenbyoujs/messages@v1')
         .where({ platform, guildId })
         .groupBy(['channelId', 'guildId'], { time: row => $.max(row.createdAt), final: 'messageId' })
@@ -98,7 +137,7 @@ class MessageService extends Service {
 
     ctx.on('bot-status-updated', async bot => {
       const guilds: Promise<Task[]>[] = []
-      const support = await bot.supports('guild.list')
+      const support = await bot.supports('guild.list') && await bot.supports('message.list')
       if (!support) return
       for await (const guild of bot.getGuildIter()) {
         guilds.push(getFinalMessages(bot.platform, guild.id, bot.selfId))
@@ -122,14 +161,13 @@ class MessageService extends Service {
         channelId,
         guildId,
         edited: updatedAt ? createdAt !== updatedAt : false,
-        // https://github.com/shigma/minato/issues/65
-        quoteId: session.quote?.id ?? '',
+        quoteId: session.quote?.id,
         createdAt: new Date(createdAt ?? Date.now()),
         updatedAt: new Date(createdAt ?? Date.now()),
-        'user.userId': user.id ?? '',
-        'user.avatar': user.avatar ?? '',
-        'user.username': user.name ?? '',
-        'user.nickname': user.nick ?? '',
+        'user.userId': user.id,
+        'user.avatar': user.avatar,
+        'user.username': user.name,
+        'user.nickname': user.nick,
       })
     })
 
@@ -149,53 +187,6 @@ class MessageService extends Service {
         edited: true,
       })
     })
-
-    ctx.setInterval(async () => {
-      const task = queue.shift()
-      if (!task) return
-      const bot = ctx.bots.find((bot) => bot.selfId === task.selfId)
-      if (!bot) {
-        this.logger.warn('Channel "%s" message sync task failed. Maybe bot offline.', task.channelId)
-        return
-      }
-
-      const support = await bot.supports('message.list')
-      if (!support) return
-      const { data, next } = await bot.getMessageList(task.channelId, task.next)
-      const sorted = data
-        .map(m => {
-          if (!m.createdAt && m.timestamp) m.createdAt = m.timestamp
-          return m
-        })
-        .sort((a, b) => b.createdAt - a.createdAt)
-      const finalIndex = sorted.findIndex(m => m.id === task.final)
-      if (finalIndex === 0) return
-      const messages = finalIndex === -1 ? sorted : sorted.slice(0, finalIndex)
-
-      await upsert(messages.map(m => ({
-        content: m.content,
-        messageId: m.id,
-        platform: bot.platform,
-        channelId: task.channelId,
-        guildId: task.guildId,
-        // https://github.com/shigma/minato/issues/65
-        quoteId: m.quote?.id ?? '',
-        createdAt: new Date(m.timestamp ?? Date.now()),
-        updatedAt: new Date(m.updatedAt ?? Date.now()),
-        edited: m.updatedAt ? m.createdAt !== m.updatedAt : false,
-        'user.userId': m.user.id ?? '',
-        'user.avatar': m.user.avatar ?? '',
-        'user.username': m.user.name ?? '',
-        'user.nickname': m.user.nick ?? '',
-      })))
-
-      if (finalIndex === -1) {
-        task.next = next
-        queue.push(task)
-      } else {
-        this.logger.debug('Channel "%s" message sync complete successfully.', task.channelId)
-      }
-    }, config.fetchInterval)
   }
 }
 
