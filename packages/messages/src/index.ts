@@ -133,6 +133,7 @@ class MessageService extends Service {
     }, {
       autoInc: true,
       primary: 'id',
+      unique: [['platform', 'channelId', 'messageId']],
     })
 
     ctx.on('bot-status-updated', async bot => {
