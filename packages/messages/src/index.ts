@@ -1,16 +1,13 @@
 import { Context, Service } from '@satorijs/core'
-import { MaybeArray, makeArray } from 'cosmokit'
-import { $, Update } from '@kaenbyoujs/database-core'
-import {} from '@kaenbyoujs/cordis-plugin-timer'
+import { makeArray, MaybeArray } from 'cosmokit'
+import { $, Update } from 'minato'
+import {} from '@cordisjs/timer'
 import Schema from 'schemastery'
 
-declare module 'cordis' {
+declare module '@satorijs/core' {
   interface Context {
     messages: MessageService
   }
-}
-
-declare module '@kaenbyoujs/database-core' {
   interface Tables {
     '@kaenbyoujs/messages@v1': Messages
   }
@@ -23,7 +20,7 @@ interface Messages {
   platform: string
   createdAt: Date
   channelId: string
-  guildId: string,
+  guildId: string
   quoteId?: string
   updatedAt?: Date
   deleted?: boolean
@@ -44,12 +41,10 @@ interface Task {
   next?: string
 }
 
-
 class MessageService extends Service {
-
   constructor(public ctx: Context, public config: MessageService.Config) {
     super(ctx, 'message')
-    const queue = ctx.createQueue<Task>(async (task) => {
+    const queue = createQueue<Task>(async (task) => {
       const bot = ctx.bots.find((bot) => bot.selfId === task.selfId)
       if (!bot) {
         this.logger.warn('Channel "%s" message sync task failed. Maybe bot offline.', task.channelId)
@@ -197,8 +192,30 @@ namespace MessageService {
   }
   export const inject = ['database']
   export const Config: Schema<Config> = Schema.object({
-    fetchInterval: Schema.number().default(50).description('获取历史消息的时间间隔')
+    fetchInterval: Schema.number().default(50).description('获取历史消息的时间间隔'),
   })
 }
 
 export default MessageService
+
+function createQueue<T>(handler: (task: T) => Promise<void> | void, interval: number) {
+  let process = false
+  return new Proxy<T[]>([], {
+    set(target, property, value) {
+      const result = Reflect.set(target, property, value)
+      if (!process && property === 'length' && value > 0) {
+        const callback = async () => {
+          process = true
+          if (!target.length) {
+            process = false
+            return
+          }
+          await handler(target.shift())
+          setTimeout(callback, interval)
+        }
+        callback()
+      }
+      return result
+    },
+  })
+}
