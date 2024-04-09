@@ -4,7 +4,7 @@ import { $, Update } from 'minato'
 import {} from '@cordisjs/timer'
 import Schema from 'schemastery'
 
-declare module '@satorijs/core' {
+declare module 'minato' {
   interface Context {
     messages: MessageService
   }

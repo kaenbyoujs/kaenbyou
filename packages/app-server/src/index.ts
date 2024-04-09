@@ -1,9 +1,11 @@
 import { camelCase, Context, sanitize, Schema, Session, snakeCase, Time, Universal } from '@satorijs/satori'
 import {} from '@cordisjs/server'
+import {} from 'minato'
+import {} from '@kaenbyoujs/messages'
 import WebSocket from 'ws'
 
 export const name = 'server'
-export const inject = ['server', 'http']
+export const inject = ['server', 'http', 'database']
 
 const kClient = Symbol('state')
 
@@ -85,9 +87,13 @@ export function apply(ctx: Context, config: Config) {
       }
     }
 
+
     const json = koa.request.body
     const selfId = koa.request.headers['x-self-id']
     const platform = koa.request.headers['x-platform']
+    if (koa.params.name === 'message.list') {
+      // ctx.database.get('')
+    }
     const bot = ctx.bots.find(bot => bot.selfId === selfId && bot.platform === platform)
     if (!bot) {
       koa.body = 'bot not found'

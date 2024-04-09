@@ -31,6 +31,8 @@
   },
   "dependencies": {
     "@cordisjs/server": "^0.1.8",
-    "@satorijs/satori": "^3.6.5"
+    "@satorijs/satori": "^3.6.5",
+    "minato": "^3.0.2",
+    "@kaenbyoujs/messages": "^0.0.1"
   }
 }
