@@ -1,6 +1,6 @@
 {
-  "name": "@kaenbyoujs/messages",
-  "description": "Message storage plugins for kaenbyou.",
+  "name": "@kaenbyoujs/app-server",
+  "description": "Satori App server implment.",
   "version": "0.0.1",
   "main": "lib/index.js",
   "module": "lib/index.mjs",
@@ -25,15 +25,12 @@
   ],
   "koishi": {
     "description": {
-      "en": "Message storage plugins for kaenbyou.",
-      "zh": "kaenbyou 消息存储组件。"
+      "en": "Satori App server implment.",
+      "zh": "Satori App 后端实现。"
     }
   },
   "dependencies": {
-    "@cordisjs/timer": "0.3.2",
-    "@satorijs/core": "^3.6.5",
-    "cosmokit": "^1.6.2",
-    "minato": "3.0.2",
-    "schemastery": "^3.14.5"
+    "@cordisjs/server": "^0.1.8",
+    "@satorijs/satori": "^3.6.5"
   }
 }
