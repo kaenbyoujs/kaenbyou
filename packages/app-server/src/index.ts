@@ -13,6 +13,11 @@ class Client {
   authorized = false
 }
 
+export interface MessageListParams {
+  channel_id: string
+  next?: string
+}
+
 export interface ApiConfig {
   enabled?: boolean
 }
@@ -91,9 +96,6 @@ export function apply(ctx: Context, config: Config) {
     const json = koa.request.body
     const selfId = koa.request.headers['x-self-id']
     const platform = koa.request.headers['x-platform']
-    if (koa.params.name === 'message.list') {
-      // ctx.database.get('')
-    }
     const bot = ctx.bots.find(bot => bot.selfId === selfId && bot.platform === platform)
     if (!bot) {
       koa.body = 'bot not found'
@@ -108,8 +110,24 @@ export function apply(ctx: Context, config: Config) {
     koa.status = 200
   })
 
-  ctx.server.post(path + '/v1/app/:name', async (koa) => {
-    // TODO
+  ctx.server.post(path + '/v1/app/message.list', async (koa) => {
+    if (config.token) {
+      if (koa.request.headers.authorization !== `Bearer ${config.token}`) {
+        koa.body = 'invalid token'
+        return koa.status = 403
+      }
+    }
+
+    const json: MessageListParams = koa.request.body
+    const result = await ctx.database.select('@kaenbyoujs/messages@v1', { channelId: json.channel_id, createdAt: { $gt: new Date(+json.next) } })
+      .orderBy('createdAt')
+      .limit(20)
+      .execute()
+
+    return {
+      data: result,
+      next: `${result.at(-1).createdAt.getTime()}`
+    }
   })
 
   ctx.server.post(path + '/v1/internal/:name', async (koa) => {

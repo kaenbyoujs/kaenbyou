@@ -13,12 +13,7 @@
     "packages/*"
   ],
   "scripts": {
-    "docs": "yarn workspace @koishijs/docs",
-    "console": "yarn workspace @root/console",
-    "dialogue": "yarn workspace @root/dialogue",
-    "minato": "yarn workspace @root/minato",
-    "satori": "yarn workspace @root/satori",
-    "yakumo": "yarn workspace @root/yakumo",
+    "cordis": "cordis",
     "clean": "node -r esbuild-register build/clean",
     "compile": "yakumo esbuild",
     "build": "yakumo esbuild && yakumo tsc",
@@ -34,12 +29,14 @@
   "license": "MIT",
   "devDependencies": {
     "@koishijs/eslint-config": "^1.0.4",
+    "@minatojs/driver-sqlite": "^4.1.0",
     "@types/node": "^20.10.5",
     "@types/source-map-support": "^0.5.10",
     "cross-env": "^7.0.3",
     "esbuild": "^0.18.20",
     "esbuild-register": "^3.5.0",
     "eslint": "^8.56.0",
+    "minato": "^3.1.1",
     "source-map-support": "^0.5.21",
     "typescript": "^5.3.3",
     "yakumo": "^0.3.13",

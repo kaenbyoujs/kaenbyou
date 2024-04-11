@@ -4,16 +4,21 @@ import { $, Update } from 'minato'
 import {} from '@cordisjs/timer'
 import Schema from 'schemastery'
 
-declare module 'minato' {
+declare module '@satorijs/core' {
   interface Context {
     messages: MessageService
   }
-  interface Tables {
-    '@kaenbyoujs/messages@v1': Messages
+}
+
+declare module 'minato' {
+  namespace Database {
+    interface Tables {
+      '@kaenbyoujs/messages@v1': Messages
+    }
   }
 }
 
-interface Messages {
+export interface Messages {
   id: number
   content: string
   messageId: string
@@ -23,8 +28,8 @@ interface Messages {
   guildId: string
   quoteId?: string
   updatedAt?: Date
-  deleted?: boolean
-  edited?: boolean
+  deleted: boolean
+  edited: boolean
   user: {
     userId: string
     username: string
