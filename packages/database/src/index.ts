@@ -1,12 +1,14 @@
-import { Context, Service } from '@satorijs/core'
+import { Context, Logger, Service } from '@satorijs/core'
 import { makeArray, MaybeArray } from 'cosmokit'
 import { $, Update } from 'minato'
 import {} from '@cordisjs/timer'
 import Schema from 'schemastery'
 
+const logger = new Logger('app-database')
+
 declare module '@satorijs/core' {
   interface Context {
-    messages: MessageService
+    appdb: AppDatabase
   }
 }
 
@@ -57,20 +59,15 @@ interface Task {
   next?: string
 }
 
-class MessageService extends Service {
-  constructor(public ctx: Context, public config: MessageService.Config) {
-    super(ctx, 'message')
+class AppDatabase extends Service {
+  constructor(public ctx: Context, public config: AppDatabase.Config) {
+    super(ctx, 'appdb')
     const queue: Task[] = []
 
     const upsert = async (msg: MaybeArray<Update<Message>>) => {
       const messages = makeArray(msg)
       await ctx.database.upsert('@kaenbyoujs/messages@v1', messages, ['channel.id', 'messageId', 'platform', 'guild.id'])
     }
-
-    // const getFinalMessages = async (platform: string, guildId: string, selfId: string): Promise<Task[]> => {
-    //   const a = 
-    //   return a
-    // }
 
     ctx.database.extend('@kaenbyoujs/messages@v1', {
       id: {
@@ -165,7 +162,7 @@ class MessageService extends Service {
       const task = queue.shift()
       const bot = ctx.bots.find((bot) => bot.selfId === task.selfId)
       if (!bot) {
-        this.logger.warn('Channel "%s" message sync task failed. Maybe bot offline.', task.channelId)
+        logger.warn('Channel "%s" message sync task failed. Maybe bot offline.', task.channelId)
         return
       }
 
@@ -200,13 +197,13 @@ class MessageService extends Service {
         task.next = next
         queue.push(task)
       } else {
-        this.logger.debug('Channel "%s" message sync complete successfully.', task.channelId)
+        logger.debug('Channel "%s" message sync complete successfully.', task.channelId)
       }
     }, config.fetchInterval)
   }
 }
 
-namespace MessageService {
+namespace AppDatabase {
   export interface Config {
     fetchInterval: number
   }
@@ -216,4 +213,4 @@ namespace MessageService {
   })
 }
 
-export default MessageService
+export default AppDatabase
