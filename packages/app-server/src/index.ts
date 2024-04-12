@@ -1,7 +1,7 @@
 import { camelCase, Context, sanitize, Schema, Session, snakeCase, Time, Universal } from '@satorijs/satori'
 import {} from '@cordisjs/server'
 import {} from 'minato'
-import {} from '@kaenbyoujs/messages'
+import {} from '@kaenbyoujs/database'
 import WebSocket from 'ws'
 
 export const name = 'server'
@@ -119,7 +119,7 @@ export function apply(ctx: Context, config: Config) {
     }
 
     const json: MessageListParams = koa.request.body
-    const result = await ctx.database.select('@kaenbyoujs/messages@v1', { channelId: json.channel_id, createdAt: { $gt: new Date(+json.next) } })
+    const result = await ctx.database.select('@kaenbyoujs/messages@v1', { 'channel.id': json.channel_id, createdAt: { $gt: new Date(+json.next) } })
       .orderBy('createdAt')
       .limit(20)
       .execute()

@@ -1,6 +1,6 @@
 {
-  "name": "@kaenbyoujs/messages",
-  "description": "Message storage plugins for kaenbyou.",
+  "name": "@kaenbyoujs/database",
+  "description": "Everything database of kaenbyou.",
   "version": "0.0.1",
   "main": "lib/index.js",
   "module": "lib/index.mjs",
@@ -14,7 +14,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kaenbyoujs/kaenbyou.git",
-    "directory": "packages/messages"
+    "directory": "packages/database"
   },
   "bugs": {
     "url": "https://github.com/kaenbyoujs/kaenbyou/issues"
@@ -23,12 +23,6 @@
   "keywords": [
     "bot"
   ],
-  "koishi": {
-    "description": {
-      "en": "Message storage plugins for kaenbyou.",
-      "zh": "kaenbyou 消息存储组件。"
-    }
-  },
   "dependencies": {
     "@cordisjs/timer": "0.3.2",
     "@satorijs/core": "^3.6.5",
