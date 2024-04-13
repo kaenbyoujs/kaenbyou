@@ -109,7 +109,7 @@ class AppDatabase extends Service {
       const support = await bot.supports('guild.list') && await bot.supports('message.list')
       if (!support) return
       for await (const guild of bot.getGuildIter()) {
-        const last = await ctx.database.select('@kaenbyoujs/messages@v1')
+        const [last] = await ctx.database.select('@kaenbyoujs/messages@v1')
         .where({ platform: bot.platform, 'guild.id': guild.id })
         // @ts-expect-error
         .groupBy(['channel.id', 'guild.id'], { time: row => $.max(row.createdAt), final: 'messageId' })
@@ -160,6 +160,7 @@ class AppDatabase extends Service {
 
     ctx.setInterval(async () => {
       const task = queue.shift()
+      if (!task) return
       const bot = ctx.bots.find((bot) => bot.selfId === task.selfId)
       if (!bot) {
         logger.warn('Channel "%s" message sync task failed. Maybe bot offline.', task.channelId)

@@ -4,11 +4,13 @@
     "baseUrl": ".",
     "paths": {
       "@kaenbyoujs/*": [
-        "packages/*",
-        "external/*",
-        "external/upstream/database/*"
+        "packages/*/src",
       ],
+      "*": ["packages/*/src"],
     },
   },
   "files": [],
+  "include": [
+    "."
+  ]
 }

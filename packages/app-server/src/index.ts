@@ -5,7 +5,7 @@ import {} from '@kaenbyoujs/database'
 import WebSocket from 'ws'
 
 export const name = 'server'
-export const inject = ['server', 'http', 'database']
+export const inject = ['server', 'http', 'appdb', 'database']
 
 const kClient = Symbol('state')
 
@@ -151,13 +151,11 @@ export function apply(ctx: Context, config: Config) {
 
   const buffer: Session[] = []
 
-  const timeout = setInterval(() => {
+  ctx.setInterval(() => {
     while (buffer[0]?.timestamp! + config.websocket?.resumeTimeout! < Date.now()) {
       buffer.shift()
     }
   }, Time.second * 10)
-
-  ctx.on('dispose', () => clearInterval(timeout))
 
   const layer = ctx.server.ws(path + '/v1/events', (socket) => {
     const client = socket[kClient] = new Client()
