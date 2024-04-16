@@ -5,7 +5,7 @@ dist
 /temp
 external
 
-.env.local
+.env
 
 .pnp.*
 .yarn/*
@@ -30,3 +30,4 @@ tsconfig.tsbuildinfo
 *.ntvs*
 *.njsproj
 *.sln
+*.db
