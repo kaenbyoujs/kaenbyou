@@ -101,7 +101,6 @@ class AppDatabase extends Service {
     }, {
       autoInc: true,
       primary: 'id',
-      // @ts-expect-error
       unique: [['platform', 'channel.id', 'messageId']],
     })
 
@@ -111,12 +110,17 @@ class AppDatabase extends Service {
       for await (const guild of bot.getGuildIter()) {
         const [last] = await ctx.database.select('@kaenbyoujs/messages@v1')
         .where({ platform: bot.platform, 'guild.id': guild.id })
-        // @ts-expect-error
-        .groupBy(['channel.id', 'guild.id'], { time: row => $.max(row.createdAt), final: 'messageId' })
+        .groupBy(['channel.id', 'guild.id'], {
+          channelId: 'channel.id',
+          guildId: 'guild.id',
+          final: 'messageId',
+          time: row => $.max(row.createdAt),
+        })
         .execute()
-        
-        // @ts-expect-error
-        queue.push({ ...last, selfId: bot.selfId })
+
+        if (!last) continue
+
+        queue.push({ ...(last as any), selfId: bot.selfId })
       }
     })
 

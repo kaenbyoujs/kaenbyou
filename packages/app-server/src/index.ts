@@ -1,7 +1,7 @@
 import { camelCase, Context, sanitize, Schema, Session, snakeCase, Time, Universal } from '@satorijs/satori'
 import {} from '@cordisjs/server'
-import {} from 'minato'
-import {} from '@kaenbyoujs/database'
+import { Query } from 'minato'
+import { Message } from '@kaenbyoujs/database'
 import WebSocket from 'ws'
 
 export const name = 'server'
@@ -17,6 +17,10 @@ export interface MessageListParams {
   channel_id: string
   next?: string
 }
+export const MessageListParams: Schema<MessageListParams> = Schema.object({
+  channel_id: Schema.string().required(),
+  next: Schema.string(),
+})
 
 export interface ApiConfig {
   enabled?: boolean
@@ -119,15 +123,30 @@ export function apply(ctx: Context, config: Config) {
     }
 
     const json: MessageListParams = koa.request.body
-    const result = await ctx.database.select('@kaenbyoujs/messages@v1', { 'channel.id': json.channel_id, createdAt: { $gt: new Date(+json.next) } })
+    try {
+      MessageListParams(json)
+    } catch {
+      koa.body = 'Bad request'
+      return koa.status = 400
+    }
+
+    const query: Query<Message> = { 'channel.id': json.channel_id }
+    if (json.next) {
+      query.createdAt = { $gt: new Date(+json.next) }
+    }
+
+    const result = await ctx.database.select('@kaenbyoujs/messages@v1')
       .orderBy('createdAt')
       .limit(20)
       .execute()
+    
+    const last = result.at(-1)
 
-    return {
+    koa.body = {
       data: result,
-      next: `${result.at(-1).createdAt.getTime()}`
+      next: last && `${last.createdAt.getTime()}`
     }
+    koa.status = 200
   })
 
   ctx.server.post(path + '/v1/internal/:name', async (koa) => {
