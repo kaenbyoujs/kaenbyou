@@ -43,7 +43,7 @@ export interface Contact {
   cover_message?: string
   update_time?: Date
   parent?: string | undefined
-  childrens?: string[] | undefined
+  children?: string[] | undefined
 }
 
 
@@ -253,7 +253,7 @@ export function apply(ctx: Context, config: Config) {
               type: Contact.TypeMap.get(chan.type),
               avatar: guild.avatar,
               parent: chan.parentId || guild.id,
-              childrens: relation[chan.id]
+              children: relation[chan.id]
             }
           }
           contacts[id].who_is_here.push(bot.selfId)
@@ -268,7 +268,7 @@ export function apply(ctx: Context, config: Config) {
             who_is_here: [],
             type: Contact.Type.GUILD,
             avatar: guild.avatar,
-            childrens: channels.map(chan => chan.id),
+            children: channels.map(chan => chan.id),
           }
         }
         contacts[id].who_is_here.push(bot.selfId)
