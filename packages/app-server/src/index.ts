@@ -1,6 +1,6 @@
-import { camelCase, Context, sanitize, Schema, Session, snakeCase, Time, Universal } from '@satorijs/satori'
+import { camelCase, Context, omit, sanitize, Schema, Session, snakeCase, Time, Universal, Dict } from '@satorijs/satori'
 import {} from '@cordisjs/server'
-import { Query } from 'minato'
+import { Query, $ } from 'minato'
 import { Message } from '@kaenbyoujs/database'
 import WebSocket from 'ws'
 
@@ -13,14 +13,56 @@ class Client {
   authorized = false
 }
 
-export interface MessageListParams {
-  channel_id: string
+export interface ListParam {
   next?: string
 }
-export const MessageListParams: Schema<MessageListParams> = Schema.object({
-  channel_id: Schema.string().required(),
-  next: Schema.string(),
+export const ListParam: Schema<ListParam> = Schema.object({
+  next: Schema.string().default("0"),
 })
+
+export interface MessageListParams extends ListParam {
+  channel_id: string
+}
+export const MessageListParams: Schema<MessageListParams> = Schema.intersect([
+  Schema.object({
+    channel_id: Schema.string().required()
+  }),
+  ListParam,
+])
+
+export interface Contact {
+  id: string
+  name: string
+  platform: string
+  who_is_here: string[]
+  type: Contact.Type
+  avatar?: string
+  cover_user_name?: string
+  cover_user_nick?: string
+  cover_user_id?: string
+  cover_message?: string
+  update_time?: Date
+  parent?: string | undefined
+  childrens?: string[] | undefined
+}
+
+
+export namespace Contact {
+  export enum Type {
+    TEXT,
+    DIRECT,
+    CATEGORY,
+    VOICE,
+    GUILD,
+  }
+
+  export const TypeMap: Map<Universal.Channel.Type, Type> = new Map([
+    [Universal.Channel.Type.TEXT, Type.TEXT],
+    [Universal.Channel.Type.DIRECT, Type.DIRECT],
+    [Universal.Channel.Type.CATEGORY, Type.CATEGORY],
+    [Universal.Channel.Type.VOICE, Type.VOICE],
+  ])
+}
 
 export interface ApiConfig {
   enabled?: boolean
@@ -137,14 +179,125 @@ export function apply(ctx: Context, config: Config) {
 
     const result = await ctx.database.select('@kaenbyoujs/messages@v1')
       .orderBy('createdAt')
-      .limit(20)
+      .limit(100)
       .execute()
-    
+
     const last = result.at(-1)
 
     koa.body = {
       data: result,
       next: last && `${last.createdAt.getTime()}`
+    }
+    koa.status = 200
+  })
+
+  ctx.server.post(path + '/v1/app/contact.list', async (koa) => {
+    if (config.token) {
+      if (koa.request.headers.authorization !== `Bearer ${config.token}`) {
+        koa.body = 'invalid token'
+        return koa.status = 403
+      }
+    }
+
+    // let json: ListParam = koa.request.body
+    // try {
+    //   json = ListParam(json)
+    // } catch {
+    //   koa.body = 'Bad request'
+    //   return koa.status = 400
+    // }
+
+    const contacts: Dict<Contact> = {}
+    for (const bot of ctx.bots) {
+      for await (const guild of bot.getGuildIter()) {
+        const { platform } = bot
+        const channels: Universal.Channel[] = []
+        const relation: Dict<string[]> = {}
+        for await (const chan of bot.getChannelIter(guild.id)) {
+          channels.push(chan)
+          const { parentId: parent } = chan
+          if (parent) {
+            if (!relation[parent]) {
+              relation[parent] = []
+            }
+            relation[parent].push(chan.id)
+          }
+        }
+
+        // handle the platform which don't have guild
+        if (channels.length === 1 && channels[0].id === guild.id) {
+          const [chan] = channels
+          const id = `${platform}:${chan.id}`
+          if (!contacts[id]) {
+            contacts[id] = {
+              id: chan.id,
+              name: chan.name,
+              platform,
+              who_is_here: [],
+              type: Contact.TypeMap.get(chan.type),
+              avatar: guild.avatar,
+            }
+          }
+          contacts[id].who_is_here.push(bot.selfId)
+          continue
+        }
+
+        for (const chan of channels) {
+          const id = `${bot.platform}:${chan.id}`
+          if (!contacts[id]) {
+            contacts[id] = {
+              id: chan.id,
+              name: chan.name,
+              platform,
+              who_is_here: [],
+              type: Contact.TypeMap.get(chan.type),
+              avatar: guild.avatar,
+              parent: chan.parentId || guild.id,
+              childrens: relation[chan.id]
+            }
+          }
+          contacts[id].who_is_here.push(bot.selfId)
+        }
+
+        const id = `${bot.platform}:${guild.id}`
+        if (!contacts[id]) {
+          contacts[id] = {
+            id: guild.id,
+            name: guild.name,
+            platform,
+            who_is_here: [],
+            type: Contact.Type.GUILD,
+            avatar: guild.avatar,
+            childrens: channels.map(chan => chan.id),
+          }
+        }
+        contacts[id].who_is_here.push(bot.selfId)
+      }
+    }
+
+    const update = await ctx.database.select('@kaenbyoujs/messages@v1')
+      .groupBy(['channel.id', 'platform'], {
+        id: row => $.concat(row.platform, ':', row.channel.id),
+        cover_user_name: 'user.name',
+        cover_user_nick: 'user.nick',
+        cover_user_id: 'user.id',
+        cover_message: 'content',
+        update_time: row => $.max(row.createdAt),
+      })
+      // .limit(100)
+      // .offset(+json.next)
+      .execute()
+      .then(data => data.map(d => omit(d, ['channel', 'platform'])))
+
+    for (const chan of update) {
+      contacts[chan.id] = {
+        ...contacts[chan.id],
+        ...omit(chan, ['id']),
+      }
+    }
+
+    koa.body = {
+      data: contacts,
     }
     koa.status = 200
   })
