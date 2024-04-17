@@ -6,6 +6,12 @@
       "@kaenbyoujs/*": [
         "packages/*/src",
       ],
+      "minato": [
+        "external/minato/packages/core"
+      ],
+      "@minatojs/driver-*": [
+        "external/minato/packages/*"
+      ],
       "*": ["packages/*/src"],
     },
   },

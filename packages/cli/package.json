@@ -1,10 +1,8 @@
 {
-  "name": "@kaenbyoujs/test",
-  "description": "kaenbyou test",
+  "name": "@kaenbyoujs/cli",
+  "description": "kaenbyou cli",
   "version": "0.0.1",
-  "main": "lib/index.js",
-  "module": "lib/index.mjs",
-  "typings": "lib/index.d.ts",
+  "bin": "lib/index.js",
   "files": [
     "lib",
     "src"
@@ -14,7 +12,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kaenbyoujs/kaenbyou.git",
-    "directory": "packages/test"
+    "directory": "packages/cli"
   },
   "bugs": {
     "url": "https://github.com/kaenbyoujs/kaenbyou/issues"
@@ -24,11 +22,12 @@
     "bot"
   ],
   "dependencies": {
+    "@cordisjs/server": "^0.1.8",
     "@kaenbyoujs/app-server": "^0.0.1",
     "@kaenbyoujs/database": "^0.0.1",
     "@minatojs/driver-sqlite": "^4.1.0",
-    "@satorijs/adapter-discord": "^4.3.1",
     "@satorijs/core": "^3.6.6",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "minato": "^3.1.1"
   }
 }

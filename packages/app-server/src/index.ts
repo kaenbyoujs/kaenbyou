@@ -1,5 +1,5 @@
-import { camelCase, Context, omit, sanitize, Schema, Session, snakeCase, Time, Universal, Dict } from '@satorijs/satori'
-import {} from '@cordisjs/server'
+import { camelCase, Context, omit, sanitize, Schema, Session, snakeCase, Time, Universal, Dict, pick } from '@satorijs/satori'
+import { } from '@cordisjs/server'
 import { Query, $ } from 'minato'
 import { Message } from '@kaenbyoujs/database'
 import WebSocket from 'ws'
@@ -29,6 +29,17 @@ export const MessageListParams: Schema<MessageListParams> = Schema.intersect([
   }),
   ListParam,
 ])
+
+export interface LoginParams {
+  config: any
+  platform: string
+  selfId?: string
+}
+export const LoginParams: Schema<LoginParams> = Schema.object({
+  config: Schema.any().required(),
+  platform: Schema.string().required(),
+  selfId: Schema.string(),
+})
 
 export interface Contact {
   id: string
@@ -115,9 +126,69 @@ function transformKey(source: any, callback: (key: string) => string) {
   }))
 }
 
-export function apply(ctx: Context, config: Config) {
+export async function apply(ctx: Context, config: Config) {
   const logger = ctx.logger('server')
   const path = sanitize(config.path)
+  const buffer: Session[] = []
+  const adapters = {
+    dingtalk: require('@satorijs/adapter-dingtalk').default,
+    discord: require('@satorijs/adapter-discord').default,
+    kook: require('@satorijs/adapter-kook').default,
+    lark: require('@satorijs/adapter-lark').default,
+    line: require('@satorijs/adapter-line').default,
+    mail: require('@satorijs/adapter-mail').default,
+    matrix: require('@satorijs/adapter-matrix').default,
+    satori: require('@satorijs/adapter-satori').default,
+    slack: require('@satorijs/adapter-slack').default,
+    telegram: require('@satorijs/adapter-telegram').default,
+    whatsapp: require('@satorijs/adapter-whatsapp').default,
+    zulip: require('@satorijs/adapter-zulip').default,
+  }
+  const layer = ctx.server.ws(path + '/v1/events', (socket) => {
+    const client = socket[kClient] = new Client()
+
+    socket.addEventListener('message', (event) => {
+      let payload: Universal.ClientPayload
+      try {
+        payload = JSON.parse(event.data.toString())
+      } catch (error) {
+        return socket.close(4000, 'invalid message')
+      }
+
+      if (payload.op === Universal.Opcode.IDENTIFY) {
+        if (config.token) {
+          if (payload.body?.token !== config.token) {
+            return socket.close(4004, 'invalid token')
+          }
+        }
+
+        client.authorized = true
+        socket.send(JSON.stringify({
+          op: Universal.Opcode.READY,
+          body: {
+            logins: transformKey(ctx.bots.map(bot => bot.toJSON()), snakeCase),
+          },
+        }))
+        if (!payload.body?.sequence) return
+        for (const session of buffer) {
+          if (session.id <= payload.body.sequence) continue
+          dispatch(socket, transformKey(session.toJSON(), snakeCase))
+        }
+      } else if (payload.op === Universal.Opcode.PING) {
+        socket.send(JSON.stringify({
+          op: Universal.Opcode.PONG,
+          body: {},
+        }))
+      }
+    })
+  })
+
+  function dispatch(socket: WebSocket, body: any) {
+    socket.send(JSON.stringify({
+      op: Universal.Opcode.EVENT,
+      body,
+    }))
+  }
 
   ctx.server.get(path + '/v1(/.+)*', async (koa) => {
     koa.body = 'Please use POST method to send requests.'
@@ -302,6 +373,48 @@ export function apply(ctx: Context, config: Config) {
     koa.status = 200
   })
 
+  ctx.server.post(path + '/v1/app/login', async (koa) => {
+    if (config.token) {
+      if (koa.request.headers.authorization !== `Bearer ${config.token}`) {
+        koa.body = 'invalid token'
+        return koa.status = 403
+      }
+    }
+
+    const json: LoginParams = koa.request.body
+    try {
+      LoginParams(json)
+    } catch {
+      koa.body = 'Bad request'
+      return koa.status = 400
+    }
+
+    const adapter = adapters[json.platform]
+
+    if (!adapter) {
+      koa.body = 'Unsupported platform'
+      return koa.status = 403
+    }
+
+    const marker = Symbol('marker')
+    ctx[marker] = true
+    ctx.plugin(adapter, json.config)
+
+    const login = await new Promise<Universal.Login>((resolve) => {
+      const dispose = ctx.on('bot-status-updated', (bot) => {
+        if (bot.ctx[marker]) {
+          if (bot.status === Universal.Status.ONLINE) {
+            resolve(pick(bot, ['user', 'selfId', 'platform', 'status']))
+            dispose()
+          }
+        }
+      })
+    })
+
+    koa.body = login
+    return koa.status = 200
+  })
+
   ctx.server.post(path + '/v1/internal/:name', async (koa) => {
     const selfId = koa.request.headers['x-self-id']
     const platform = koa.request.headers['x-platform']
@@ -321,59 +434,11 @@ export function apply(ctx: Context, config: Config) {
     koa.status = 200
   })
 
-  const buffer: Session[] = []
-
   ctx.setInterval(() => {
     while (buffer[0]?.timestamp! + config.websocket?.resumeTimeout! < Date.now()) {
       buffer.shift()
     }
   }, Time.second * 10)
-
-  const layer = ctx.server.ws(path + '/v1/events', (socket) => {
-    const client = socket[kClient] = new Client()
-
-    socket.addEventListener('message', (event) => {
-      let payload: Universal.ClientPayload
-      try {
-        payload = JSON.parse(event.data.toString())
-      } catch (error) {
-        return socket.close(4000, 'invalid message')
-      }
-
-      if (payload.op === Universal.Opcode.IDENTIFY) {
-        if (config.token) {
-          if (payload.body?.token !== config.token) {
-            return socket.close(4004, 'invalid token')
-          }
-        }
-
-        client.authorized = true
-        socket.send(JSON.stringify({
-          op: Universal.Opcode.READY,
-          body: {
-            logins: transformKey(ctx.bots.map(bot => bot.toJSON()), snakeCase),
-          },
-        }))
-        if (!payload.body?.sequence) return
-        for (const session of buffer) {
-          if (session.id <= payload.body.sequence) continue
-          dispatch(socket, transformKey(session.toJSON(), snakeCase))
-        }
-      } else if (payload.op === Universal.Opcode.PING) {
-        socket.send(JSON.stringify({
-          op: Universal.Opcode.PONG,
-          body: {},
-        }))
-      }
-    })
-  })
-
-  function dispatch(socket: WebSocket, body: any) {
-    socket.send(JSON.stringify({
-      op: Universal.Opcode.EVENT,
-      body,
-    }))
-  }
 
   ctx.on('internal/session', (session) => {
     const body = transformKey(session.toJSON(), snakeCase)
