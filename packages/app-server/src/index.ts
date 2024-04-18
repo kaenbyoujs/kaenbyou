@@ -33,12 +33,10 @@ export const MessageListParams: Schema<MessageListParams> = Schema.intersect([
 export interface LoginParams {
   config: any
   platform: string
-  selfId?: string
 }
 export const LoginParams: Schema<LoginParams> = Schema.object({
   config: Schema.any().required(),
   platform: Schema.string().required(),
-  selfId: Schema.string(),
 })
 
 export interface Contact {
