@@ -233,20 +233,24 @@ export async function apply(ctx: Context, config: Config) {
       }
     }
 
-    const json: MessageListParams = koa.request.body
+    let json: MessageListParams = koa.request.body
     try {
-      MessageListParams(json)
+      json = MessageListParams(json)
     } catch {
       koa.body = 'Bad request'
       return koa.status = 400
     }
 
     const query: Query<Message> = { 'channel.id': json.channel_id }
+    const platfrom = koa.request.headers['x-platform']
     if (json.next) {
       query.createdAt = { $gt: new Date(+json.next) }
     }
+    if (platfrom) {
+      query.platform = platfrom
+    }
 
-    const result = await ctx.database.select('@kaenbyoujs/messages@v1')
+    const result = await ctx.database.select('@kaenbyoujs/messages@v1', query)
       .orderBy('createdAt')
       .limit(100)
       .execute()
