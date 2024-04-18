@@ -5,6 +5,8 @@
 
 ### message.list
 - Path: `/v1/app/message.list`
+- Headers
+  - Needs `x-platfrom`
 - Params:
 ```ts
 type MessageListParams = {
@@ -81,35 +83,35 @@ type Login = Universal.Login
 
 // Universal from satori
 namespace Universal {
-    interface Login {
-        user?: User;
-        platform?: string;
-        selfId?: string;
-        hidden?: boolean;
-        status: Status;
-    }
+  interface Login {
+    user?: User;
+    platform?: string;
+    selfId?: string;
+    hidden?: boolean;
+    status: Status;
+  }
 
-    interface User {
-        id: string;
-        name?: string;
-        nick?: string;
-        /** @deprecated */
-        userId?: string;
-        /** @deprecated */
-        username?: string;
-        /** @deprecated */
-        nickname?: string;
-        avatar?: string;
-        discriminator?: string;
-        isBot?: boolean;
-    }
+  interface User {
+    id: string;
+    name?: string;
+    nick?: string;
+    /** @deprecated */
+    userId?: string;
+    /** @deprecated */
+    username?: string;
+    /** @deprecated */
+    nickname?: string;
+    avatar?: string;
+    discriminator?: string;
+    isBot?: boolean;
+  }
 
-    const enum Status {
-        OFFLINE = 0,
-        ONLINE = 1,
-        CONNECT = 2,
-        DISCONNECT = 3,
-        RECONNECT = 4
-    }
+  const enum Status {
+    OFFLINE = 0,
+    ONLINE = 1,
+    CONNECT = 2,
+    DISCONNECT = 3,
+    RECONNECT = 4
+  }
 }
 ```
