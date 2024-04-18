@@ -6,7 +6,7 @@
 ### message.list
 - Path: `/v1/app/message.list`
 - Headers
-  - Needs `x-platfrom`
+  - Needs `x-platform`
 - Params:
 ```ts
 type MessageListParams = {
