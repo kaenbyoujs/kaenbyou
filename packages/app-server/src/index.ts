@@ -408,10 +408,15 @@ export async function apply(ctx: Context, config: Config) {
     return koa.status = 200
   })
 
+  const loginCache = new WeakMap<Bot, Universal.Login>()
+
   ctx.server.post(path + '/v1/app/login.list', async (koa) => {
     const login = []
     for (const bot of ctx.bots) {
-      login.push(await bot.getLogin())
+      if (!loginCache.has(bot)) {
+        loginCache.set(bot, await bot.getLogin())
+      }
+      login.push(loginCache.get(bot))
     }
     koa.body = {
       data: login,
