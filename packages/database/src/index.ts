@@ -1,4 +1,4 @@
-import { Context, Logger, Service } from '@satorijs/core'
+import { Context, Logger, Service, Universal } from '@satorijs/core'
 import { makeArray, MaybeArray } from 'cosmokit'
 import { $, Update } from 'minato'
 import {} from '@cordisjs/timer'
@@ -105,6 +105,7 @@ class AppDatabase extends Service {
     })
 
     ctx.on('bot-status-updated', async bot => {
+      if (bot.status !== Universal.Status.ONLINE) return
       const support = await bot.supports('guild.list') && await bot.supports('message.list')
       if (!support) return
       for await (const guild of bot.getGuildIter()) {
