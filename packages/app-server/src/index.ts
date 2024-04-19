@@ -408,6 +408,18 @@ export async function apply(ctx: Context, config: Config) {
     return koa.status = 200
   })
 
+  ctx.server.post(path + '/v1/app/login.list', async (koa) => {
+    const login = []
+    for (const bot of ctx.bots) {
+      login.push(await bot.getLogin())
+    }
+    koa.body = {
+      data: login,
+      next: null
+    }
+    koa.status = 200
+  })
+
   ctx.server.post(path + '/v1/internal/:name', async (koa) => {
     const bot = koa.matchedBot
 
