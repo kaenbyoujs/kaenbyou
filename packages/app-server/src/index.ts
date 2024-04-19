@@ -189,6 +189,24 @@ export async function apply(ctx: Context, config: Config) {
     }))
   }
 
+  // Permission Check
+  ctx.server.use(path + '/v1(/.+)*', async (koa, next) => {
+    if (config.token) {
+      if (koa.request.headers.authorization !== `Bearer ${config.token}`) {
+        koa.body = 'invalid token'
+        return koa.status = 403
+      }
+    }
+    await next()
+  })
+
+  // Method Check
+  ctx.server.get(path + '/v1(/.+)*', async (koa) => {
+    koa.body = 'Please use POST method to send requests.'
+    koa.status = 405
+  })
+
+  // Get Bot/Adapter Instance
   ctx.server.use([
     path + '/v1/:name',
     path + '/v1/internal/:name'
@@ -196,20 +214,16 @@ export async function apply(ctx: Context, config: Config) {
     async (koa, next) => {
       koa.matchedBot = ctx.bots
         .find(bot =>
-           (bot.selfId === koa.request.headers['x-self-id'] && bot.platform === koa.request.headers['x-platform']) ||
-            false
-           )
+          (bot.selfId === koa.request.headers['x-self-id'] && bot.platform === koa.request.headers['x-platform']) ||
+          false
+        )
 
       koa.matchedAdapter =
-          koa.matchedBot?.adapter
+        koa.matchedBot?.adapter
 
       await next()
     })
 
-  ctx.server.get(path + '/v1(/.+)*', async (koa) => {
-    koa.body = 'Please use POST method to send requests.'
-    koa.status = 405
-  })
 
   ctx.server.post(path + '/v1/:name', async (koa) => {
     const method = Universal.Methods[koa.params.name]
@@ -217,14 +231,6 @@ export async function apply(ctx: Context, config: Config) {
       koa.body = 'method not found'
       return koa.status = 404
     }
-
-    if (config.token) {
-      if (koa.request.headers.authorization !== `Bearer ${config.token}`) {
-        koa.body = 'invalid token'
-        return koa.status = 403
-      }
-    }
-
 
     const json = koa.request.body
     const bot = koa.matchedBot
@@ -238,13 +244,6 @@ export async function apply(ctx: Context, config: Config) {
   })
 
   ctx.server.post(path + '/v1/app/message.list', async (koa) => {
-    if (config.token) {
-      if (koa.request.headers.authorization !== `Bearer ${config.token}`) {
-        koa.body = 'invalid token'
-        return koa.status = 403
-      }
-    }
-
     let json: MessageListParams = koa.request.body
     try {
       json = MessageListParams(json)
@@ -277,13 +276,6 @@ export async function apply(ctx: Context, config: Config) {
   })
 
   ctx.server.post(path + '/v1/app/contact.list', async (koa) => {
-    if (config.token) {
-      if (koa.request.headers.authorization !== `Bearer ${config.token}`) {
-        koa.body = 'invalid token'
-        return koa.status = 403
-      }
-    }
-
     // let json: ListParam = koa.request.body
     // try {
     //   json = ListParam(json)
@@ -388,12 +380,6 @@ export async function apply(ctx: Context, config: Config) {
   })
 
   ctx.server.post(path + '/v1/app/login', async (koa) => {
-    if (config.token) {
-      if (koa.request.headers.authorization !== `Bearer ${config.token}`) {
-        koa.body = 'invalid token'
-        return koa.status = 403
-      }
-    }
 
     const json: LoginParams = koa.request.body
     try {
