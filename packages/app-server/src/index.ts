@@ -189,7 +189,7 @@ export async function apply(ctx: Context, config: Config) {
     }))
   }
 
-  // Permission Check
+  // Authorization
   ctx.server.use(path + '/v1(/.+)*', async (koa, next) => {
     if (config.token) {
       if (koa.request.headers.authorization !== `Bearer ${config.token}`) {
@@ -276,14 +276,6 @@ export async function apply(ctx: Context, config: Config) {
   })
 
   ctx.server.post(path + '/v1/app/contact.list', async (koa) => {
-    // let json: ListParam = koa.request.body
-    // try {
-    //   json = ListParam(json)
-    // } catch {
-    //   koa.body = 'Bad request'
-    //   return koa.status = 400
-    // }
-
     const contacts: Dict<Contact> = {}
     for (const bot of ctx.bots) {
       for await (const guild of bot.getGuildIter()) {
@@ -375,6 +367,7 @@ export async function apply(ctx: Context, config: Config) {
 
     koa.body = {
       data: contacts,
+      next: null
     }
     koa.status = 200
   })
