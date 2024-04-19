@@ -1,8 +1,9 @@
-import { camelCase, Context, omit, sanitize, Schema, Session, snakeCase, Time, Universal, Dict, pick } from '@satorijs/satori'
+import { camelCase, Context, omit, sanitize, Schema, Session, snakeCase, Time, Universal, Dict, pick, Bot, Adapter } from '@satorijs/satori'
 import { } from '@cordisjs/server'
 import { Query, $ } from 'minato'
 import { Message } from '@kaenbyoujs/database'
 import WebSocket from 'ws'
+import { Context as KoaContext } from 'koa'
 
 export const name = 'server'
 export const inject = ['server', 'http', 'appdb', 'database']
@@ -188,6 +189,23 @@ export async function apply(ctx: Context, config: Config) {
     }))
   }
 
+  ctx.server.use([
+    path + '/v1/:name',
+    path + '/v1/internal/:name'
+  ],
+    async (koa, next) => {
+      koa.matchedBot = ctx.bots
+        .find(bot =>
+           (bot.selfId === koa.request.headers['x-self-id'] && bot.platform === koa.request.headers['x-platform']) ||
+            false
+           )
+
+      koa.matchedAdapter =
+          koa.matchedBot?.adapter
+
+      await next()
+    })
+
   ctx.server.get(path + '/v1(/.+)*', async (koa) => {
     koa.body = 'Please use POST method to send requests.'
     koa.status = 405
@@ -209,13 +227,7 @@ export async function apply(ctx: Context, config: Config) {
 
 
     const json = koa.request.body
-    const selfId = koa.request.headers['x-self-id']
-    const platform = koa.request.headers['x-platform']
-    const bot = ctx.bots.find(bot => bot.selfId === selfId && bot.platform === platform)
-    if (!bot) {
-      koa.body = 'bot not found'
-      return koa.status = 403
-    }
+    const bot = koa.matchedBot
 
     const args = method.fields.map(({ name }) => {
       return transformKey(json[name], camelCase)
@@ -418,13 +430,7 @@ export async function apply(ctx: Context, config: Config) {
   })
 
   ctx.server.post(path + '/v1/internal/:name', async (koa) => {
-    const selfId = koa.request.headers['x-self-id']
-    const platform = koa.request.headers['x-platform']
-    const bot = ctx.bots.find(bot => bot.selfId === selfId && bot.platform === platform)
-    if (!bot) {
-      koa.body = 'bot not found'
-      return koa.status = 403
-    }
+    const bot = koa.matchedBot
 
     const name = camelCase(koa.params.name)
     if (!bot.internal?.[name]) {
