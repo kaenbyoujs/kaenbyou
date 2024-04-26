@@ -18,7 +18,11 @@ ctx.plugin(Server, {
   port: 3453
 })
 ctx.plugin(AppDatabase)
-ctx.plugin(AppServer)
+ctx.plugin(AppServer, {
+  token: '0',
+  path: '/',
+  webhooks: []
+})
 
 ;(async () => {
   await ctx.start()
