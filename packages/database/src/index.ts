@@ -47,7 +47,7 @@ export interface Message {
 
 export interface History {
   id: number
-  belong: number
+  parent: number
   content: string
 }
 
@@ -66,7 +66,9 @@ class AppDatabase extends Service {
 
     const upsert = async (msg: MaybeArray<Update<Message>>) => {
       const messages = makeArray(msg)
-      await ctx.database.upsert('@kaenbyoujs/messages@v1', messages, ['channel.id', 'messageId', 'platform', 'guild.id'])
+      ctx.database.withTransaction(async (database) => {
+        await database.upsert('@kaenbyoujs/messages@v1', messages, ['channel.id', 'messageId', 'platform', 'guild.id'])
+      })
     }
 
     ctx.database.extend('@kaenbyoujs/messages@v1', {
@@ -104,7 +106,7 @@ class AppDatabase extends Service {
       unique: [['platform', 'channel.id', 'messageId']],
     })
 
-    ctx.on('bot-status-updated', async bot => {
+    ctx.on('bot-status-updated', async (bot) => {
       if (bot.status !== Universal.Status.ONLINE) return
       const support = await bot.supports('guild.list') && await bot.supports('message.list')
       if (!support) return
@@ -125,7 +127,7 @@ class AppDatabase extends Service {
       }
     })
 
-    ctx.on('message', async session => {
+    ctx.on('message', async (session) => {
       const { content, messageId, platform, guildId, channelId } = session
       const { createdAt, updatedAt } = session.event?.message ?? {}
       const { user } = session.event
@@ -146,7 +148,7 @@ class AppDatabase extends Service {
       })
     })
 
-    ctx.on('message-deleted', async session => {
+    ctx.on('message-deleted', async (session) => {
       const msg = session.event.message
       await ctx.database.set('@kaenbyoujs/messages@v1', { messageId: msg.id, 'channel.id': session.channelId, platform: session.platform }, {
         updatedAt: new Date(msg.updatedAt ?? Date.now()),
@@ -154,7 +156,7 @@ class AppDatabase extends Service {
       })
     })
 
-    ctx.on('message-updated', async session => {
+    ctx.on('message-updated', async (session) => {
       const msg = session.event.message
       await ctx.database.set('@kaenbyoujs/messages@v1', { messageId: msg.id, platform: session.platform }, {
         content: msg.content,
