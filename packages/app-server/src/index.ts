@@ -282,7 +282,7 @@ export async function apply(ctx: Context, config: Config) {
         const { platform } = bot
         const channels: Universal.Channel[] = []
         const relation: Dict<string[]> = {}
-        
+
         for await (const chan of bot.getChannelIter(guild.id)) {
           channels.push(chan)
           const { parentId: parent } = chan
@@ -362,10 +362,7 @@ export async function apply(ctx: Context, config: Config) {
       // contacts[chan.id].id = contacts
     }
 
-    koa.body = {
-      data: Object.values(contacts),
-      next: null
-    }
+    koa.body = contacts
     koa.status = 200
   })
 
