@@ -245,7 +245,7 @@ export async function apply(ctx: Context, config: Config) {
     koa.status = 200
   })
 
-  ctx.server.post(path + '/v1/app/messages.get', async (koa) => {
+  ctx.server.post(path + '/v1/app/message.get', async (koa) => {
     let json: MessageListParams = koa.request.body
     try {
       json = MessageListParams(json)
