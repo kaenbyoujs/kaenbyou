@@ -275,7 +275,7 @@ export async function apply(ctx: Context, config: Config) {
     koa.status = 200
   })
 
-  ctx.server.post(path + '/v1/app/contact.list', async (koa) => {
+  ctx.server.post(path + '/v1/app/contact.get', async (koa) => {
     const contacts: Dict<Contact> = {}
     for (const bot of ctx.bots) {
       for await (const guild of bot.getGuildIter()) {
