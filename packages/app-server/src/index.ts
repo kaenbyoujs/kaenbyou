@@ -215,7 +215,7 @@ export async function apply(ctx: Context, config: Config) {
       koa.matchedBot = ctx.bots
         .find(bot =>
           (bot.selfId == koa.request.headers['x-self-id'] && bot.platform == koa.request.headers['x-platform']) ||
-          false
+          (`${bot.platform}:${bot.selfId}` == koa.request.headers['x-aid'])
         )
 
       koa.matchedAdapter =
@@ -413,7 +413,10 @@ export async function apply(ctx: Context, config: Config) {
       login.push(loginCache.get(bot))
     }
     koa.body = {
-      data: login,
+      data: login.map(v=>({
+        ...v,
+        aid: `${v.platform}:${v.selfId}`
+      })),
       next: null
     }
     koa.status = 200
