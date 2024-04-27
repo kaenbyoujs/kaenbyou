@@ -214,7 +214,7 @@ export async function apply(ctx: Context, config: Config) {
     async (koa, next) => {
       koa.matchedBot = ctx.bots
         .find(bot =>
-          (bot.selfId === koa.request.headers['x-self-id'] && bot.platform === koa.request.headers['x-platform']) ||
+          (bot.selfId == koa.request.headers['x-self-id'] && bot.platform == koa.request.headers['x-platform']) ||
           false
         )
 
@@ -282,6 +282,7 @@ export async function apply(ctx: Context, config: Config) {
         const { platform } = bot
         const channels: Universal.Channel[] = []
         const relation: Dict<string[]> = {}
+        
         for await (const chan of bot.getChannelIter(guild.id)) {
           channels.push(chan)
           const { parentId: parent } = chan
@@ -293,19 +294,17 @@ export async function apply(ctx: Context, config: Config) {
           }
         }
 
-        // handle the platform which don't have guild
+        // handle the platforms without a guild
         if (channels.length === 1 && channels[0].id === guild.id) {
           const [chan] = channels
           const id = `${platform}:${chan.id}`
-          if (!contacts[id]) {
-            contacts[id] = {
-              id: chan.id,
-              name: chan.name,
-              platform,
-              who_is_here: [],
-              type: Contact.TypeMap.get(chan.type),
-              avatar: guild.avatar,
-            }
+          contacts[id] ??= {
+            id: chan.id,
+            name: chan.name ?? guild.name,
+            platform,
+            who_is_here: [],
+            type: Contact.TypeMap.get(chan.type),
+            avatar: guild.avatar,
           }
           contacts[id].who_is_here.push(bot.selfId)
           continue
@@ -313,32 +312,28 @@ export async function apply(ctx: Context, config: Config) {
 
         for (const chan of channels) {
           const id = `${bot.platform}:${chan.id}`
-          if (!contacts[id]) {
-            contacts[id] = {
-              id: chan.id,
-              name: chan.name,
-              platform,
-              who_is_here: [],
-              type: Contact.TypeMap.get(chan.type),
-              avatar: guild.avatar,
-              parent: chan.parentId || guild.id,
-              children: relation[chan.id]
-            }
+          contacts[id] ??= {
+            id: chan.id,
+            name: chan.name ?? guild.name,
+            platform,
+            who_is_here: [],
+            type: Contact.TypeMap.get(chan.type),
+            avatar: guild.avatar,
+            parent: chan.parentId || guild.id,
+            children: relation[chan.id]
           }
           contacts[id].who_is_here.push(bot.selfId)
         }
 
         const id = `${bot.platform}:${guild.id}`
-        if (!contacts[id]) {
-          contacts[id] = {
-            id: guild.id,
-            name: guild.name,
-            platform,
-            who_is_here: [],
-            type: Contact.Type.GUILD,
-            avatar: guild.avatar,
-            children: channels.map(chan => chan.id),
-          }
+        contacts[id] ??= {
+          id: guild.id,
+          name: guild.name,
+          platform,
+          who_is_here: [],
+          type: Contact.Type.GUILD,
+          avatar: guild.avatar,
+          children: channels.map(chan => chan.id),
         }
         contacts[id].who_is_here.push(bot.selfId)
       }
@@ -346,7 +341,7 @@ export async function apply(ctx: Context, config: Config) {
 
     const update = await ctx.database.select('@kaenbyoujs/messages@v1')
       .groupBy(['channel.id', 'platform'], {
-        id: row => $.concat(row.platform, ':', row.channel.id),
+        pid: row => $.concat(row.platform, ':', row.channel.id),
         cover_user_name: 'user.name',
         cover_user_nick: 'user.nick',
         cover_user_id: 'user.id',
@@ -359,14 +354,16 @@ export async function apply(ctx: Context, config: Config) {
       .then(data => data.map(d => omit(d, ['channel', 'platform'])))
 
     for (const chan of update) {
-      contacts[chan.id] = {
-        ...contacts[chan.id],
-        ...omit(chan, ['id']),
+      contacts[chan.pid] = {
+        ...contacts[chan.pid],
+        ...chan,
       }
+
+      // contacts[chan.id].id = contacts
     }
 
     koa.body = {
-      data: contacts,
+      data: Object.values(contacts),
       next: null
     }
     koa.status = 200
