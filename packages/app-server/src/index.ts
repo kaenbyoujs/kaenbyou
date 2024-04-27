@@ -185,6 +185,13 @@ export async function apply(ctx: Context, config: Config) {
     }))
   }
 
+  const broadcastAuthorized = (body:any) => {
+    for (const socket of layer.clients) {
+      if (!socket[kClient]?.authorized) continue
+      dispatch(socket, body)
+    }
+  }
+
   // Authorization
   ctx.server.use(path + '/v1(/.+)*', async (koa, next) => {
     if (config.token) {
@@ -386,6 +393,9 @@ export async function apply(ctx: Context, config: Config) {
         if (bot.ctx[marker]) {
           if (bot.status === Universal.Status.ONLINE) {
             resolve(pick(bot, ['user', 'selfId', 'platform', 'status']))
+            broadcastAuthorized({
+                type: 'app-login'
+            })
             dispose()
           }
         }
@@ -437,10 +447,7 @@ export async function apply(ctx: Context, config: Config) {
 
   ctx.on('internal/session', (session) => {
     const body = transformKey(session.toJSON(), snakeCase)
-    for (const socket of layer.clients) {
-      if (!socket[kClient]?.authorized) continue
-      dispatch(socket, body)
-    }
+    broadcastAuthorized(body)
     for (const webhook of config.webhooks) {
       if (!webhook.enabled) continue
       ctx.http.post(webhook.endpoint, body, {
