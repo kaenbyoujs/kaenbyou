@@ -1,9 +1,8 @@
 import { camelCase, Context, omit, sanitize, Schema, Session, snakeCase, Time, Universal, Dict, pick, Bot, Adapter } from '@satorijs/satori'
 import { } from '@cordisjs/server'
-import { Query, $ } from 'minato'
+import { Query, $, Direction } from 'minato'
 import { Message } from '@kaenbyoujs/database'
 import WebSocket from 'ws'
-import { Context as KoaContext } from 'koa'
 
 export const name = 'server'
 export const inject = ['server', 'http', 'appdb', 'database']
@@ -14,22 +13,19 @@ class Client {
   authorized = false
 }
 
-export interface ListParam {
-  next?: string
-}
-export const ListParam: Schema<ListParam> = Schema.object({
-  next: Schema.string().default("0"),
-})
-
-export interface MessageListParams extends ListParam {
+export interface MessageListParams {
   channel_id: string
+  direction: Direction
+  cursor?: number
 }
-export const MessageListParams: Schema<MessageListParams> = Schema.intersect([
-  Schema.object({
-    channel_id: Schema.string().required()
-  }),
-  ListParam,
-])
+export const MessageListParams: Schema<MessageListParams> = Schema.object({
+  channel_id: Schema.string().required(),
+  direction: Schema.union([
+    Schema.const('desc'),
+    Schema.const('asc')
+  ]).default('desc'),
+  cursor: Schema.number()
+})
 
 export interface LoginParams {
   config: any
@@ -224,7 +220,6 @@ export async function apply(ctx: Context, config: Config) {
       await next()
     })
 
-
   ctx.server.post(path + '/v1/:name', async (koa) => {
     const method = Universal.Methods[koa.params.name]
     if (!method) {
@@ -243,7 +238,7 @@ export async function apply(ctx: Context, config: Config) {
     koa.status = 200
   })
 
-  ctx.server.post(path + '/v1/app/message.list', async (koa) => {
+  ctx.server.post(path + '/v1/app/messages.get', async (koa) => {
     let json: MessageListParams = koa.request.body
     try {
       json = MessageListParams(json)
@@ -254,24 +249,23 @@ export async function apply(ctx: Context, config: Config) {
 
     const query: Query<Message> = { 'channel.id': json.channel_id }
     const platfrom = koa.request.headers['x-platform']
-    if (json.next) {
-      query.createdAt = { $gt: new Date(+json.next) }
+    if (json.cursor) {
+      if (json.direction === 'desc') {
+        query.id = { $lt: json.cursor }
+      } else {
+        query.id = { $gt: json.cursor }
+      }
     }
     if (platfrom) {
       query.platform = platfrom
     }
 
-    const result = await ctx.database.select('@kaenbyoujs/messages@v1', query)
-      .orderBy('createdAt')
+    let result = await ctx.database.select('@kaenbyoujs/messages@v1', query)
+      .orderBy('createdAt', json.direction)
       .limit(100)
       .execute()
 
-    const last = result.at(-1)
-
-    koa.body = {
-      data: result,
-      next: last && `${last.createdAt.getTime()}`
-    }
+    koa.body = json.direction === 'desc' ? result : result.reverse()
     koa.status = 200
   })
 
