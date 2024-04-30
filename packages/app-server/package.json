@@ -27,7 +27,7 @@
     "@cordisjs/server": "^0.1.8",
     "@kaenbyoujs/database": "^0.0.1",
     "@satorijs/adapter-dingtalk": "^2.3.1",
-    "@satorijs/adapter-discord": "^4.3.1",
+    "@satorijs/adapter-discord": "^4.4.0",
     "@satorijs/adapter-kook": "^4.5.1",
     "@satorijs/adapter-lark": "^3.4.1",
     "@satorijs/adapter-line": "^2.3.2",
@@ -38,7 +38,7 @@
     "@satorijs/adapter-telegram": "^4.4.1",
     "@satorijs/adapter-whatsapp": "^2.4.0",
     "@satorijs/adapter-zulip": "^1.2.0",
-    "@satorijs/satori": "^3.6.6",
-    "minato": "3.1.1"
+    "@satorijs/satori": "^3.7.0",
+    "minato": "^3.1.1"
   }
 }

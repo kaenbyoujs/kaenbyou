@@ -24,10 +24,10 @@
     "bot"
   ],
   "dependencies": {
-    "@cordisjs/timer": "0.3.2",
-    "@satorijs/core": "^3.6.6",
+    "@cordisjs/timer": "^0.3.2",
+    "@satorijs/core": "^3.7.0",
     "cosmokit": "^1.6.2",
-    "minato": "3.1.1",
-    "schemastery": "^3.14.5"
+    "minato": "^3.1.1",
+    "schemastery": "^3.14.6"
   }
 }
