@@ -268,7 +268,7 @@ export async function apply(ctx: Context, config: Config) {
 
     let result = await ctx.database.select('@kaenbyoujs/messages@v1', query)
       .orderBy('createdAt', json.direction)
-      .limit(100)
+      .limit(45)
       .execute()
 
     koa.body = json.direction === 'desc' ? result : result.reverse()
@@ -405,9 +405,6 @@ export async function apply(ctx: Context, config: Config) {
         if (bot.ctx[marker]) {
           if (bot.status === Universal.Status.ONLINE) {
             resolve(pick(bot, ['user', 'selfId', 'platform', 'status']))
-            broadcastAuthorized({
-                type: 'app-login'
-            })
             dispose()
           }
         }
