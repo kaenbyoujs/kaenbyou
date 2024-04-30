@@ -74,7 +74,7 @@ class AppDatabase extends Service {
         length: 8,
       },
       content: 'text',
-      messageId: 'string',
+      id: 'string',
       platform: 'string',
       createdAt: 'timestamp',
       quote: 'string',
@@ -100,7 +100,7 @@ class AppDatabase extends Service {
     }, {
       autoInc: true,
       primary: 'internalId',
-      unique: [['platform', 'channel.id', 'messageId']],
+      unique: [['platform', 'channel.id', 'id']],
     })
 
     ctx.on('bot-status-updated', async (bot) => {
@@ -184,7 +184,7 @@ class AppDatabase extends Service {
 
       await upsert(messages.map(m => ({
         content: m.content,
-        messageId: m.id,
+        id: m.id,
         platform: bot.platform,
         'channel.id': task.channelId,
         'guild.id': task.guildId,
