@@ -127,7 +127,7 @@ class AppDatabase extends Service {
     ctx.on('message', async (session) => {
       const { content, messageId, platform, guildId, channelId } = session
       const { createdAt, updatedAt } = session.event?.message ?? {}
-      const { user } = session.event
+      const { user, member } = session.event
       await upsert({
         content,
         id: messageId,
@@ -140,7 +140,7 @@ class AppDatabase extends Service {
         updatedAt: new Date(createdAt ?? Date.now()),
         'user.id': user.id,
         'user.avatar': user.avatar,
-        'user.name': user.name,
+        'user.name': user.name || member.name,
         'user.nick': user.nick,
       })
     })
