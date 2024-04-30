@@ -52,7 +52,6 @@ export interface Contact {
   children?: string[] | undefined
 }
 
-
 export namespace Contact {
   export enum Type {
     TEXT,
@@ -258,9 +257,9 @@ export async function apply(ctx: Context, config: Config) {
     const platfrom = koa.request.headers['x-platform']
     if (json.cursor) {
       if (json.direction === 'desc') {
-        query.id = { $lt: json.cursor }
+        query.internalId = { $lt: json.cursor }
       } else {
-        query.id = { $gt: json.cursor }
+        query.internalId = { $gt: json.cursor }
       }
     }
     if (platfrom) {
@@ -279,8 +278,8 @@ export async function apply(ctx: Context, config: Config) {
   ctx.server.post(path + '/v1/app/contact.get', async (koa) => {
     const contacts: Dict<Contact> = {}
     for (const bot of ctx.bots) {
+      const { platform } = bot
       for await (const guild of bot.getGuildIter()) {
-        const { platform } = bot
         const channels: Universal.Channel[] = []
         const relation: Dict<string[]> = {}
 
@@ -338,6 +337,19 @@ export async function apply(ctx: Context, config: Config) {
         }
         contacts[id].who_is_here.push(bot.selfId)
       }
+
+      for await (const user of bot.getFriendIter()) {
+        const { id } = await bot.createDirectChannel(user.id)
+        contacts[id] ??= {
+          id: user.id,
+          name: user.nick ?? user.name,
+          platform,
+          who_is_here: [],
+          type: Contact.Type.DIRECT,
+          avatar: user.avatar,
+        }
+        contacts[id].who_is_here.push(bot.selfId)
+      }
     }
 
     const update = await ctx.database.select('@kaenbyoujs/messages@v1')
@@ -363,7 +375,7 @@ export async function apply(ctx: Context, config: Config) {
       // contacts[chan.id].id = contacts
     }
 
-    koa.body = contacts
+    koa.body = Object.values(contacts)
     koa.status = 200
   })
 

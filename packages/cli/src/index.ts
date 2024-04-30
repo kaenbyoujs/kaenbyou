@@ -8,7 +8,7 @@ import 'dotenv/config'
 
 const logger = new Logger('tester')
 
-const ctx = new Context()
+const ctx = new Context({})
 ctx.plugin(Database)
 ctx.plugin(SQLite, {
   path: './test.db'
