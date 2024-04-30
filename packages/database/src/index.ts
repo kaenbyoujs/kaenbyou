@@ -7,23 +7,22 @@ import Schema from 'schemastery'
 const logger = new Logger('app-database')
 
 declare module '@satorijs/core' {
+  
   interface Context {
     appdb: AppDatabase
   }
 }
 
 declare module 'minato' {
-  namespace Database {
-    interface Tables {
-      '@kaenbyoujs/messages@v1': Message
-    }
+  interface Tables {
+    '@kaenbyoujs/messages@v1': Message
   }
 }
 
 export interface Message {
-  id: number
+  internalId: number // before: id
   content: string
-  messageId: string
+  id: string // before: messageId
   platform: string
   quote?: string
   createdAt: Date
@@ -66,13 +65,11 @@ class AppDatabase extends Service {
 
     const upsert = async (msg: MaybeArray<Update<Message>>) => {
       const messages = makeArray(msg)
-      ctx.database.withTransaction(async (database) => {
-        await database.upsert('@kaenbyoujs/messages@v1', messages, ['channel.id', 'messageId', 'platform', 'guild.id'])
-      })
+      await ctx.database.upsert('@kaenbyoujs/messages@v1', messages, ['channel.id', 'id', 'platform'])
     }
 
     ctx.database.extend('@kaenbyoujs/messages@v1', {
-      id: {
+      internalId: {
         type: 'unsigned',
         length: 8,
       },
@@ -102,7 +99,7 @@ class AppDatabase extends Service {
       }
     }, {
       autoInc: true,
-      primary: 'id',
+      primary: 'internalId',
       unique: [['platform', 'channel.id', 'messageId']],
     })
 
@@ -113,10 +110,10 @@ class AppDatabase extends Service {
       for await (const guild of bot.getGuildIter()) {
         const [last] = await ctx.database.select('@kaenbyoujs/messages@v1')
         .where({ platform: bot.platform, 'guild.id': guild.id })
-        .groupBy(['channel.id', 'guild.id'], {
+        .groupBy(['channel.id'], {
           channelId: 'channel.id',
           guildId: 'guild.id',
-          final: 'messageId',
+          final: 'id',
           time: row => $.max(row.createdAt),
         })
         .execute()
@@ -133,7 +130,7 @@ class AppDatabase extends Service {
       const { user } = session.event
       await upsert({
         content,
-        messageId,
+        id: messageId,
         platform,
         'channel.id': channelId,
         'guild.id': guildId,
@@ -150,7 +147,7 @@ class AppDatabase extends Service {
 
     ctx.on('message-deleted', async (session) => {
       const msg = session.event.message
-      await ctx.database.set('@kaenbyoujs/messages@v1', { messageId: msg.id, 'channel.id': session.channelId, platform: session.platform }, {
+      await ctx.database.set('@kaenbyoujs/messages@v1', { id: msg.id, 'channel.id': session.channelId, platform: session.platform }, {
         updatedAt: new Date(msg.updatedAt ?? Date.now()),
         deleted: true,
       })
@@ -158,7 +155,7 @@ class AppDatabase extends Service {
 
     ctx.on('message-updated', async (session) => {
       const msg = session.event.message
-      await ctx.database.set('@kaenbyoujs/messages@v1', { messageId: msg.id, platform: session.platform }, {
+      await ctx.database.set('@kaenbyoujs/messages@v1', { id: msg.id, platform: session.platform }, {
         content: msg.content,
         updatedAt: new Date(msg.updatedAt ?? Date.now()),
         edited: true,
