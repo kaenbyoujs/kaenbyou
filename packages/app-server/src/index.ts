@@ -267,7 +267,7 @@ export async function apply(ctx: Context, config: Config) {
 
     const [{ result }] = await ctx.database.select('@kaenbyoujs/messages@v1', query)
       .limit(1)
-      .orderBy('internalId', 'desc')
+      .orderBy('internalId', json.direction)
       .project({
         anchor: row => $.object(row),
         result: sub => ctx.database.select('@kaenbyoujs/messages@v1', row => {
@@ -278,8 +278,14 @@ export async function apply(ctx: Context, config: Config) {
           if (json.channel_id) {
             query.push($.eq(row.channel.id, json.channel_id))
           }
-          return $.and(...query, $.lt(row.internalId, sub.internalId))
+          if (json.direction === 'desc') {
+            query.push($.lt(row.internalId, sub.internalId))
+          } else {
+            query.push($.gt(row.internalId, sub.internalId))
+          }
+          return $.and(...query)
         })
+          .orderBy('internalId', json.direction)
           .limit(45)
           .evaluate()
       })
