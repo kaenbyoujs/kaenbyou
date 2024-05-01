@@ -14,17 +14,17 @@ class Client {
 }
 
 export interface MessageListParams {
-  channel_id?: string
   direction?: Direction
-  cursor?: number
+  channel_id?: string
+  message_id?: string
 }
 export const MessageListParams: Schema<MessageListParams> = Schema.object({
-  channel_id: Schema.string(),
   direction: Schema.union([
     Schema.const('desc'),
     Schema.const('asc')
   ]).default('desc'),
-  cursor: Schema.number()
+  channel_id: Schema.string(),
+  message_id: Schema.string(),
 })
 
 export interface LoginParams {
@@ -254,25 +254,41 @@ export async function apply(ctx: Context, config: Config) {
     }
 
     const query: Query<Message> = {}
-    const platfrom = koa.request.headers['x-platform']
+    const platform = koa.request.headers['x-platform']?.toString()
     if (json.channel_id) {
-      query['channel.id'] = json.channel_id 
+      query['channel.id'] = json.channel_id
     }
-    if (json.cursor) {
-      if (json.direction === 'desc') {
-        query.internalId = { $lt: json.cursor }
-      } else {
-        query.internalId = { $gt: json.cursor }
-      }
+    if (json.message_id) {
+      query.id = json.message_id
     }
-    if (platfrom) {
-      query.platform = platfrom
+    if (platform) {
+      query.platform = platform
     }
 
-    let result = await ctx.database.select('@kaenbyoujs/messages@v1', query)
-      .orderBy('createdAt', json.direction)
-      .limit(45)
+    const [{ result }] = await ctx.database.select('@kaenbyoujs/messages@v1', query)
+      .limit(1)
+      .orderBy('internalId', 'desc')
+      .project({
+        anchor: row => $.object(row),
+        result: sub => ctx.database.select('@kaenbyoujs/messages@v1', row => {
+          const query: $.Term<boolean, false>[] = []
+          if (platform) {
+            query.push($.eq(row.platform, platform))
+          }
+          if (json.channel_id) {
+            query.push($.eq(row.channel.id, json.channel_id))
+          }
+          return $.and(...query, $.lt(row.internalId, sub.internalId))
+        })
+          .limit(45)
+          .evaluate()
+      })
       .execute()
+      
+    // let result = await ctx.database.select('@kaenbyoujs/messages@v1', query)
+    //   .orderBy('createdAt', json.direction)
+    //   .limit(45)
+    //   .execute()
 
     koa.body = json.direction === 'desc' ? result : result.reverse()
     koa.status = 200
