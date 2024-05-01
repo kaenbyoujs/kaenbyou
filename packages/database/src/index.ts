@@ -139,9 +139,9 @@ class AppDatabase extends Service {
         createdAt: new Date(createdAt ?? Date.now()),
         updatedAt: new Date(createdAt ?? Date.now()),
         'user.id': user.id,
-        'user.avatar': user.avatar,
-        'user.name': user.name || member.name,
-        'user.nick': user.nick,
+        'user.avatar': member?.avatar || user?.avatar,
+        'user.name': member?.name || user?.name,
+        'user.nick': member?.nick || user?.nick,
       })
     })
 
@@ -155,7 +155,7 @@ class AppDatabase extends Service {
 
     ctx.on('message-updated', async (session) => {
       const msg = session.event.message
-      await ctx.database.set('@kaenbyoujs/messages@v1', { id: msg.id, platform: session.platform }, {
+      await ctx.database.set('@kaenbyoujs/messages@v1', { id: msg.id, 'channel.id': session.channelId, platform: session.platform }, {
         content: msg.content,
         updatedAt: new Date(msg.updatedAt ?? Date.now()),
         edited: true,
@@ -179,7 +179,6 @@ class AppDatabase extends Service {
         })
         .sort((a, b) => b.createdAt - a.createdAt)
       const finalIndex = sorted.findIndex(m => m.id === task.final)
-      if (finalIndex === 0) return
       const messages = finalIndex === -1 ? sorted : sorted.slice(0, finalIndex)
 
       await upsert(messages.map(m => ({
@@ -198,7 +197,7 @@ class AppDatabase extends Service {
         'user.nick': m?.member?.nick || m?.user?.nick,
       })))
 
-      if (finalIndex === -1) {
+      if (finalIndex < 1) {
         task.next = next
         queue.push(task)
       } else {

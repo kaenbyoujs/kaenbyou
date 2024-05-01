@@ -14,12 +14,12 @@ class Client {
 }
 
 export interface MessageListParams {
-  channel_id: string
-  direction: Direction
+  channel_id?: string
+  direction?: Direction
   cursor?: number
 }
 export const MessageListParams: Schema<MessageListParams> = Schema.object({
-  channel_id: Schema.string().required(),
+  channel_id: Schema.string(),
   direction: Schema.union([
     Schema.const('desc'),
     Schema.const('asc')
@@ -253,8 +253,11 @@ export async function apply(ctx: Context, config: Config) {
       return koa.status = 400
     }
 
-    const query: Query<Message> = { 'channel.id': json.channel_id }
+    const query: Query<Message> = {}
     const platfrom = koa.request.headers['x-platform']
+    if (json.channel_id) {
+      query['channel.id'] = json.channel_id 
+    }
     if (json.cursor) {
       if (json.direction === 'desc') {
         query.internalId = { $lt: json.cursor }
