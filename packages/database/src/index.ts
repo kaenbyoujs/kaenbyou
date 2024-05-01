@@ -192,10 +192,10 @@ class AppDatabase extends Service {
         createdAt: new Date(m.timestamp ?? Date.now()),
         updatedAt: new Date(m.updatedAt ?? Date.now()),
         edited: m.updatedAt ? m.createdAt !== m.updatedAt : false,
-        'user.userId': m.user.id,
-        'user.avatar': m.user.avatar,
-        'user.username': m.user.name,
-        'user.nickname': m.user.nick,
+        'user.id': m.user.id,
+        'user.avatar': m?.member?.avatar || m?.user?.avatar,
+        'user.name': m?.member?.name || m?.user?.name,
+        'user.nick': m?.member?.nick || m?.user?.nick,
       })))
 
       if (finalIndex === -1) {
