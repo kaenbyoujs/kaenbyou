@@ -3,6 +3,7 @@ import { } from '@cordisjs/server'
 import { Query, $, Direction } from 'minato'
 import { Message } from '@kaenbyoujs/database'
 import WebSocket from 'ws'
+import { createTextStore } from './utils'
 
 export const name = 'server'
 export const inject = ['server', 'http', 'appdb', 'database']
@@ -14,15 +15,15 @@ class Client {
 }
 
 export interface MessageListParams {
-  direction?: Direction
+  direction?: 'up' | 'down'
   channel_id?: string
   message_id?: string
 }
 export const MessageListParams: Schema<MessageListParams> = Schema.object({
   direction: Schema.union([
-    Schema.const('desc'),
-    Schema.const('asc')
-  ]).default('desc'),
+    Schema.const('up'),
+    Schema.const('down'),
+  ]).default('up'),
   channel_id: Schema.string(),
   message_id: Schema.string(),
 })
@@ -47,7 +48,7 @@ export interface Contact {
   cover_user_nick?: string
   cover_user_id?: string
   cover_message?: string
-  update_time?: Date
+  update_time?: Number
   parent?: string | undefined
   children?: string[] | undefined
 }
@@ -265,38 +266,34 @@ export async function apply(ctx: Context, config: Config) {
       query.platform = platform
     }
 
-    const [{ result }] = await ctx.database.select('@kaenbyoujs/messages@v1', query)
-      .limit(1)
-      .orderBy('internalId', json.direction)
-      .project({
-        anchor: row => $.object(row),
-        result: sub => ctx.database.select('@kaenbyoujs/messages@v1', row => {
-          const query: $.Term<boolean, false>[] = []
-          if (platform) {
-            query.push($.eq(row.platform, platform))
-          }
-          if (json.channel_id) {
-            query.push($.eq(row.channel.id, json.channel_id))
-          }
-          if (json.direction === 'desc') {
-            query.push($.lt(row.internalId, sub.internalId))
-          } else {
-            query.push($.gt(row.internalId, sub.internalId))
-          }
-          return $.and(...query)
-        })
-          .orderBy('internalId', json.direction)
-          .limit(45)
-          .evaluate()
-      })
-      .execute()
-      
-    // let result = await ctx.database.select('@kaenbyoujs/messages@v1', query)
-    //   .orderBy('createdAt', json.direction)
-    //   .limit(45)
-    //   .execute()
+    const [result] = await ctx.database.select('@kaenbyoujs/messages@v1', query)
+      .orderBy('createdAt', 'desc')
+      .limit(1).execute()
 
-    koa.body = json.direction === 'desc' ? result : result.reverse()
+    // console.log("Found result: ", result)
+
+    if (!result) {
+      koa.body = 'Not found'
+      return koa.status = 404
+    }
+
+    delete query.id
+    // 如果是向上 那么internalid自增，肯定小于cursor
+    query.internalId = json.direction === 'up' ? {
+      $lt: result.internalId
+    } : {
+      $gt: result.internalId
+    }
+
+    const messages = (await ctx.database.select('@kaenbyoujs/messages@v1', query)
+      .limit(20)
+      .orderBy('createdAt', 
+        json.direction === 'up' ? 'desc' : 'asc')
+      .execute()).filter(m => m.id !== result.id)
+
+    // console.log("Found messages: ", messages)
+    if (json.direction === 'down') messages.reverse()
+    koa.body = messages
     koa.status = 200
   })
 
@@ -395,6 +392,7 @@ export async function apply(ctx: Context, config: Config) {
       contacts[chan.pid] = {
         ...contacts[chan.pid],
         ...chan,
+        update_time: chan.update_time.getTime()
       }
 
       // contacts[chan.id].id = contacts
@@ -403,6 +401,14 @@ export async function apply(ctx: Context, config: Config) {
     koa.body = Object.values(contacts)
     koa.status = 200
   })
+
+  const [adapterStore, saveAdapterStore] = createTextStore('adapters.json', [])
+
+  for (const adapterSaved of adapterStore) {
+    const adapter = adapters[adapterSaved.platform]
+    if (!adapter) continue
+    ctx.plugin(adapter, adapterSaved.config)
+  }
 
   ctx.server.post(path + '/v1/app/login', async (koa) => {
 
@@ -431,6 +437,12 @@ export async function apply(ctx: Context, config: Config) {
           if (bot.status === Universal.Status.ONLINE) {
             resolve(pick(bot, ['user', 'selfId', 'platform', 'status']))
             dispose()
+
+            adapterStore.push({
+              platform: json.platform,
+              config: json.config,
+            })
+            saveAdapterStore()
           }
         }
       })
@@ -494,5 +506,9 @@ export async function apply(ctx: Context, config: Config) {
 }
 
 process.on('unhandledException', (error) => {
+  console.log(error)
+})
+
+process.on('unhandledRejection', (error) => {
   console.log(error)
 })

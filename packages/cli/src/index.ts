@@ -5,6 +5,7 @@ import SQLite from '@minatojs/driver-sqlite'
 import { Context, Logger } from '@satorijs/core'
 import Database from 'minato'
 import 'dotenv/config'
+// import login from './login'
 
 const logger = new Logger('tester')
 
@@ -23,6 +24,8 @@ ctx.plugin(AppServer, {
   path: '/',
   webhooks: []
 })
+
+// login(ctx)
 
 ;(async () => {
   await ctx.start()
