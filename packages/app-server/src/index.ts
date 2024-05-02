@@ -492,3 +492,7 @@ export async function apply(ctx: Context, config: Config) {
     }
   })
 }
+
+process.on('unhandledException', (error) => {
+  console.log(error)
+})
